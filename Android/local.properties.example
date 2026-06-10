@@ -1,0 +1,8 @@
+# Copy to local.properties and fill in sdk.dir for your machine.
+sdk.dir=C:/Users/YOUR_USER/AppData/Local/Android/Sdk
+
+# Optional: release signing (uncomment after creating a keystore)
+# RELEASE_STORE_FILE=../sans347-release.keystore
+# RELEASE_STORE_PASSWORD=your-store-password
+# RELEASE_KEY_ALIAS=sans347
+# RELEASE_KEY_PASSWORD=your-key-password

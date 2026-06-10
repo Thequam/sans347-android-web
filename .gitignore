@@ -1,0 +1,32 @@
+# IDE
+.idea/
+*.iml
+.DS_Store
+
+# Android
+Android/.gradle/
+Android/**/build/
+Android/local.properties
+Android/*.keystore
+Android/*.jks
+Android/*.apk
+Android/*.ap_
+Android/*.aab
+
+# Web (Next.js)
+sans347-app/node_modules/
+sans347-app/.next/
+sans347-app/out/
+sans347-app/.vercel
+sans347-app/.env*
+sans347-app/*.tsbuildinfo
+sans347-app/next-env.d.ts
+sans347-app/npm-debug.log*
+sans347-app/yarn-debug.log*
+sans347-app/yarn-error.log*
+sans347-app/.pnpm-debug.log*
+
+# Misc
+.cursor/
+.claude/
+*.pem
