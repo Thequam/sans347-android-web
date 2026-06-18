@@ -1,0 +1,38 @@
+import SwiftUI
+
+/// Brand palette ported 1:1 from `ui/theme/SansColors.kt`.
+enum SansColors {
+    static let primaryCyan = Color(hex: "#00C2FF")
+    static let darkBackground = Color(hex: "#0F0F0F")
+    static let pageBackground = Color(hex: "#F3F4F6")
+    static let white = Color.white
+    static let mediumGray = Color(hex: "#353E43")
+    static let darkGray = Color(hex: "#4A5568")
+    static let gray700 = Color(hex: "#374151")
+    static let gray600 = Color(hex: "#4B5563")
+    static let gray500 = Color(hex: "#6B7280")
+    static let gray400 = Color(hex: "#9CA3AF")
+    static let gray300 = Color(hex: "#D1D5DB")
+    static let gray200 = Color(hex: "#E5E7EB")
+    static let gray50 = Color(hex: "#F9FAFB")
+    static let darkBlueGray = Color(hex: "#111827")
+    static let navBorder = Color(hex: "#333333")
+    static let majorGrid = Color(hex: "#9CA3AF")
+    static let minorGrid = Color(hex: "#C8CCD2")
+    static let boundaryRed = Color(hex: "#DC2626")
+    static let applicationBg = Color(hex: "#EFF6FF")
+    static let applicationBorder = Color(hex: "#BFDBFE")
+    static let applicationLabel = Color(hex: "#2563EB")
+    static let warningBg = Color(hex: "#FEFCE8")
+    static let warningBorder = Color(hex: "#FDE68A")
+    static let warningIcon = Color(hex: "#D97706")
+    static let success = Color(hex: "#10B981")
+    static let thumbSelectedBg = Color(hex: "#ECFEFF")
+    static let axisTitle = Color(hex: "#1F2937")
+    static let scrollTrack = Color(hex: "#1F2937")
+    static let scrollThumb = Color(hex: "#4B5563")
+    static let categoryI = Color(hex: "#3B82F6")
+    static let categoryII = Color(hex: "#EAB308")
+    static let categoryIII = Color(hex: "#F97316")
+    static let categoryIV = Color(hex: "#EF4444")
+}

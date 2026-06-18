@@ -1,0 +1,89 @@
+# Builds and runs the SANS347 iOS parity test suite on a macOS runner.
+# Requires Xcode 16+ (synchronized folder groups in the Xcode project).
+name: iOS
+
+on:
+  push:
+    branches: [master, main]
+    paths:
+      - "iOS/**"
+      - ".github/workflows/ios.yml"
+  pull_request:
+    paths:
+      - "iOS/**"
+      - ".github/workflows/ios.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ios-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Build & test (Simulator)
+    runs-on: macos-15
+    defaults:
+      run:
+        working-directory: iOS
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode 16
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: "16"
+
+      - name: Show toolchain
+        run: |
+          xcodebuild -version
+          xcrun simctl list devices available | head -40
+
+      - name: Resolve simulator
+        id: sim
+        run: |
+          for NAME in "iPhone 16" "iPhone 15" "iPhone 14"; do
+            if xcrun simctl list devices available | grep -F "$NAME (" | grep -qv "unavailable"; then
+              echo "name=$NAME" >> "$GITHUB_OUTPUT"
+              echo "Using simulator: $NAME"
+              exit 0
+            fi
+          done
+          echo "No suitable iPhone simulator found on this runner." >&2
+          xcrun simctl list devices available
+          exit 1
+
+      - name: Build
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project SANS347.xcodeproj \
+            -scheme SANS347 \
+            -configuration Debug \
+            -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.name }}" \
+            CODE_SIGNING_ALLOWED=NO \
+            | tee xcodebuild-build.log
+
+      - name: Test
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -project SANS347.xcodeproj \
+            -scheme SANS347 \
+            -configuration Debug \
+            -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.name }}" \
+            CODE_SIGNING_ALLOWED=NO \
+            -resultBundlePath TestResults.xcresult \
+            | tee xcodebuild-test.log
+
+      - name: Upload logs and test bundle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-ci-${{ github.run_id }}
+          path: |
+            iOS/xcodebuild-build.log
+            iOS/xcodebuild-test.log
+            iOS/TestResults.xcresult
+          if-no-files-found: ignore

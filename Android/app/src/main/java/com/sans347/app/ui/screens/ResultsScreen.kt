@@ -1,6 +1,5 @@
 package com.sans347.app.ui.screens
 
-import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -31,11 +30,14 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -54,6 +56,12 @@ import com.sans347.app.data.getCategoryColorHex
 import com.sans347.app.data.getCategoryRisk
 import com.sans347.app.data.getConformityModules
 import com.sans347.app.data.graphById
+import com.sans347.app.export.ExportColors
+import com.sans347.app.export.ExportPlotPoint
+import com.sans347.app.export.ExportShare
+import com.sans347.app.export.GraphPngExporter
+import com.sans347.app.export.ReportPdfExporter
+import com.sans347.app.export.formatCategoryDisplayLabel
 import com.sans347.app.ui.graph.AspectFitGraphFrame
 import com.sans347.app.ui.graph.LandscapeGraphSidebar
 import com.sans347.app.ui.graph.PlotPointData
@@ -61,6 +69,9 @@ import com.sans347.app.ui.graph.Sans347Graph
 import com.sans347.app.ui.graph.ZoomableGraphBox
 import com.sans347.app.ui.theme.SansColors
 import com.sans347.app.ui.theme.colorFromHex
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.Locale
 
 fun fmtNum(v: Double): String = String.format(Locale.US, "%,.0f", v).replace(',', ' ')
@@ -103,18 +114,63 @@ fun ResultsScreen(
     }
 
     var showResultCard by remember { mutableStateOf(true) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    val plotPoint = ExportPlotPoint(
+        x = result.vOrDn,
+        y = result.ps,
+        colorHex = ExportColors.composeToHex(catColor),
+    )
+
+    val onExportPng: () -> Unit = {
+        scope.launch {
+            try {
+                val file = withContext(Dispatchers.IO) {
+                    GraphPngExporter.exportToCache(ctx, graph, plotPoint)
+                }
+                ExportShare.shareFile(ctx, file, "image/png", "Export graph (PNG)")
+                snackbarHostState.showSnackbar("Graph exported as PNG")
+            } catch (_: Exception) {
+                snackbarHostState.showSnackbar("PNG export failed")
+            }
+        }
+    }
+
+    val onExportPdf: () -> Unit = {
+        scope.launch {
+            try {
+                val file = withContext(Dispatchers.IO) {
+                    ReportPdfExporter.exportToCache(ctx, result, graph, catRisk, conformity, plotPoint)
+                }
+                ExportShare.shareFile(ctx, file, "application/pdf", "Export report (PDF)")
+                snackbarHostState.showSnackbar("Report exported as PDF")
+            } catch (_: Exception) {
+                snackbarHostState.showSnackbar("PDF export failed")
+            }
+        }
+    }
 
     if (immersiveGraph) {
-        ResultsImmersiveLayout(
-            graph = graph,
-            result = result,
-            catColor = catColor,
-            productLabel = productLabel,
-            showResultCard = showResultCard,
-            onToggleCard = { showResultCard = !showResultCard },
-            onBackToInput = onBackToInput,
-            modifier = modifier,
-        )
+        Box(modifier = modifier.fillMaxSize()) {
+            ResultsImmersiveLayout(
+                graph = graph,
+                result = result,
+                catColor = catColor,
+                productLabel = productLabel,
+                showResultCard = showResultCard,
+                onToggleCard = { showResultCard = !showResultCard },
+                onBackToInput = onBackToInput,
+                onExportPng = onExportPng,
+                onExportPdf = onExportPdf,
+                modifier = Modifier.fillMaxSize(),
+            )
+            SnackbarHost(
+                hostState = snackbarHostState,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 16.dp),
+            )
+        }
         return
     }
 
@@ -202,26 +258,25 @@ fun ResultsScreen(
                         Spacer(Modifier.size(8.dp))
                         Text("New Calculation")
                     }
-                    Spacer(Modifier.size(12.dp))
-                    Button(
-                        onClick = {
-                            val text = buildExportText(result, graph, isPiping, catRisk, conformity)
-                            val send = Intent(Intent.ACTION_SEND).apply {
-                                type = "text/plain"
-                                putExtra(Intent.EXTRA_SUBJECT, "SANS 347 Calculation Results")
-                                putExtra(Intent.EXTRA_TEXT, text)
-                            }
-                            ctx.startActivity(Intent.createChooser(send, "Export Results"))
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = SansColors.PrimaryCyan),
-                    ) {
-                        Icon(Icons.Default.Description, null, modifier = Modifier.size(16.dp))
-                        Spacer(Modifier.size(8.dp))
-                        Text("Export Results", color = SansColors.White)
-                    }
                 }
+
+                Spacer(Modifier.height(12.dp))
+
+                ResultsExportButtons(
+                    onExportPng = onExportPng,
+                    onExportPdf = onExportPdf,
+                    compact = false,
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
         }
+
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 100.dp),
+        )
     }
 }
 
@@ -276,6 +331,8 @@ private fun ResultsImmersiveLayout(
     showResultCard: Boolean,
     onToggleCard: () -> Unit,
     onBackToInput: () -> Unit,
+    onExportPng: () -> Unit,
+    onExportPdf: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -301,13 +358,22 @@ private fun ResultsImmersiveLayout(
                 }
             },
             footerContent = {
-                ResultsSidebarResultSection(
-                    result = result,
-                    catColor = catColor,
-                    productLabel = productLabel,
-                    showResultCard = showResultCard,
-                    onToggleCard = onToggleCard,
-                )
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    ResultsSidebarResultSection(
+                        result = result,
+                        catColor = catColor,
+                        productLabel = productLabel,
+                        showResultCard = showResultCard,
+                        onToggleCard = onToggleCard,
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    ResultsExportButtons(
+                        onExportPng = onExportPng,
+                        onExportPdf = onExportPdf,
+                        compact = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
             },
         )
 
@@ -367,7 +433,7 @@ private fun ResultsSidebarResultSection(
                 }
                 Spacer(Modifier.size(8.dp))
                 Text(
-                    result.category,
+                    formatCategoryDisplayLabel(result.category),
                     fontWeight = FontWeight.Bold,
                     fontSize = 13.sp,
                     color = catColor,
@@ -398,6 +464,48 @@ private fun ResultsSidebarResultSection(
                 Spacer(Modifier.size(8.dp))
                 Text("Tap to expand", fontSize = 10.sp, color = SansColors.Gray500)
             }
+        }
+    }
+}
+
+@Composable
+private fun ResultsExportButtons(
+    onExportPng: () -> Unit,
+    onExportPdf: () -> Unit,
+    compact: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Button(
+            onClick = onExportPng,
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.buttonColors(containerColor = SansColors.PrimaryCyan),
+            contentPadding = PaddingValues(horizontal = 8.dp, vertical = if (compact) 6.dp else 10.dp),
+        ) {
+            Icon(Icons.Default.BarChart, null, modifier = Modifier.size(if (compact) 14.dp else 16.dp))
+            Spacer(Modifier.size(if (compact) 4.dp else 8.dp))
+            Text(
+                if (compact) "PNG" else "Export graph (PNG)",
+                color = SansColors.White,
+                fontSize = if (compact) 11.sp else 14.sp,
+            )
+        }
+        Button(
+            onClick = onExportPdf,
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = SansColors.Gray700),
+            border = ButtonDefaults.outlinedButtonBorder(enabled = true),
+            contentPadding = PaddingValues(horizontal = 8.dp, vertical = if (compact) 6.dp else 10.dp),
+        ) {
+            Icon(Icons.Default.Description, null, modifier = Modifier.size(if (compact) 14.dp else 16.dp))
+            Spacer(Modifier.size(if (compact) 4.dp else 8.dp))
+            Text(
+                if (compact) "PDF" else "Export report (PDF)",
+                fontSize = if (compact) 11.sp else 14.sp,
+            )
         }
     }
 }
@@ -671,32 +779,5 @@ private fun ConformityCard(conformity: ConformityModules) {
                 .border(1.dp, SansColors.Gray200, RoundedCornerShape(8.dp))
                 .padding(12.dp),
         )
-    }
-}
-
-private fun buildExportText(
-    result: ResultData,
-    graph: GraphConfig,
-    isPiping: Boolean,
-    catRisk: String,
-    conformity: ConformityModules,
-): String = buildString {
-    appendLine("SANS 347 Calculation Results")
-    appendLine("Category: ${result.category}")
-    appendLine("Risk: $catRisk")
-    appendLine("Figure: ${graph.id}")
-    appendLine("Design pressure: ${fmtNum(result.ps)} kPa")
-    appendLine(if (isPiping) "DN: ${fmtNum(result.vOrDn)}" else "Volume: ${fmtNum(result.vOrDn)} L")
-    appendLine("Product: ${fmtNum(result.product)}")
-    if (result.category != "SEP" && result.category != "Not regulated") {
-        appendLine()
-        appendLine("Without QMS: ${conformity.withoutQuality}")
-        appendLine("With QMS: ${conformity.withQuality}")
-    }
-    appendLine()
-    if (requiresPrEng(result.category)) {
-        appendLine("Pr Eng sign-off: REQUIRED (Category ${result.category})")
-    } else {
-        appendLine("Pr Eng sign-off: Not required")
     }
 }
